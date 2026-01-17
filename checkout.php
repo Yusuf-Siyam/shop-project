@@ -54,7 +54,14 @@ if (isset($_POST['place_order'])) {
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     
     $stmt = $conn->prepare($createOrderQuery);
-    $stmt->bind_param("idsssss", $userId, $totalAmount, $paymentMethod, $shippingAddress, 
+    
+    // FIX 1: Check if prepare failed (Usually because table doesn't exist or query error)
+    if ($stmt === false) {
+        die("Error preparing order query: " . $conn->error);
+    }
+
+    // FIX 2: Added one more 's' to type string. Now it is "idssssss" (8 chars) for 8 variables.
+    $stmt->bind_param("idssssss", $userId, $totalAmount, $paymentMethod, $shippingAddress, 
                       $shippingCity, $shippingPostalCode, $shippingPhone, $notes);
     
     if ($stmt->execute()) {
@@ -64,29 +71,34 @@ if (isset($_POST['place_order'])) {
         $addItemQuery = "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
         $itemStmt = $conn->prepare($addItemQuery);
         
-        foreach ($cartItems as $item) {
-            $productId = $item['product_id'];
-            $quantity = $item['quantity'];
-            $price = $item['price'];
-            
-            $itemStmt->bind_param("iiid", $orderId, $productId, $quantity, $price);
-            $itemStmt->execute();
+        if ($itemStmt) {
+            foreach ($cartItems as $item) {
+                $productId = $item['product_id'];
+                $quantity = $item['quantity'];
+                $price = $item['price'];
+                
+                $itemStmt->bind_param("iiid", $orderId, $productId, $quantity, $price);
+                $itemStmt->execute();
+            }
+            $itemStmt->close();
         }
-        $itemStmt->close();
         
         // Clear the cart using prepared statement
         $clearCartQuery = "DELETE FROM cart WHERE user_id = ?";
         $clearStmt = $conn->prepare($clearCartQuery);
-        $clearStmt->bind_param("i", $userId);
-        $clearStmt->execute();
-        $clearStmt->close();
+        if ($clearStmt) {
+            $clearStmt->bind_param("i", $userId);
+            $clearStmt->execute();
+            $clearStmt->close();
+        }
         
         // Redirect to order confirmation
         header("Location: order-confirmation.php?order_id=$orderId");
         exit();
     } else {
-        $error = "Error creating order: " . mysqli_error($conn);
+        $error = "Error creating order: " . $stmt->error;
     }
+    $stmt->close();
 }
 ?>
 
@@ -101,10 +113,8 @@ if (isset($_POST['place_order'])) {
     <link rel="stylesheet" href="e-shop.css">
 </head>
 <body>
-    <!-- Include Navigation Component -->
     <?php include 'nav-component.php'; ?>
 
-    <!-- Checkout Section -->
     <section class="checkout-section">
         <div class="container">
             <h2 class="section-title">Checkout</h2>
@@ -244,7 +254,6 @@ if (isset($_POST['place_order'])) {
         </div>
     </section>
     
-    <!-- Footer -->
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
@@ -300,4 +309,4 @@ if (isset($_POST['place_order'])) {
     
 
 </body>
-</html> 
+</html>

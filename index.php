@@ -16,8 +16,8 @@ if(isset($_SESSION['success'])) {
     unset($_SESSION['success']);
 }
 
-// 2. LOGIN LOGIC (Updated to work even if button is disabled by JS)
-// Register form posts to register.php, so any POST to this file MUST be login
+// 2. LOGIN LOGIC
+// We use REQUEST_METHOD to ensure it works even if JS disables the button
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
     $password = $_POST['password'];
@@ -41,8 +41,16 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_SESSION['lastName'] = $row['lastName'];
             $_SESSION['role'] = $row['role']; 
             
-            // Redirect to Homepage
-            header("Location: homepage.php");
+            // --- ROLE BASED REDIRECTION START ---
+            if ($row['role'] === 'admin') {
+                // If user is Admin, go to Admin Panel
+                header("Location: admin.php");
+            } else {
+                // If user is Regular User, go to Homepage
+                header("Location: homepage.php");
+            }
+            // --- ROLE BASED REDIRECTION END ---
+            
             exit();
         } else {
             $error = "Incorrect password!";
@@ -627,7 +635,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 const button = this.querySelector('button[type="submit"]');
                 const originalText = button.innerHTML;
                 button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                button.disabled = true; // This line was causing the issue, fixed by updating PHP
+                button.disabled = true;
                 
                 // Re-enable after 3 seconds (in case of error)
                 setTimeout(() => {
