@@ -1,6 +1,15 @@
 <?php
 // Navigation Component - Include this file in all pages for consistent navigation
-session_start();
+
+// FIX 1: Only start session if one isn't already active
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// FIX 2: Ensure database connection exists for the cart counter
+if (!isset($conn)) {
+    include_once 'connect.php';
+}
 
 // Get current page name for active navigation
 $current_page = basename($_SERVER['PHP_SELF'], '.php');
@@ -64,10 +73,8 @@ $userFirstName = isset($_SESSION['firstName']) ? $_SESSION['firstName'] : '';
 $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
 ?>
 
-<!-- Smart Navigation Component -->
 <nav class="smart-nav">
     <div class="nav-container">
-        <!-- Left Section: Logo and Back Button -->
         <div class="nav-left">
             <?php if($current_page !== 'index' && $current_page !== 'homepage'): ?>
                 <a href="<?php echo getPreviousPage($current_page); ?>" class="back-btn" title="Go Back">
@@ -84,7 +91,6 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
             </a>
         </div>
 
-        <!-- Center Section: Breadcrumbs -->
         <div class="nav-center">
             <div class="breadcrumbs">
                 <?php 
@@ -101,10 +107,8 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
             </div>
         </div>
 
-        <!-- Right Section: Navigation Links and User Menu -->
         <div class="nav-right">
             <?php if($isLoggedIn): ?>
-                <!-- Logged in user navigation -->
                 <div class="nav-links">
                     <a href="shop.php" class="nav-link <?php echo $current_page === 'shop' ? 'active' : ''; ?>">
                         <i class="fas fa-store"></i>
@@ -115,15 +119,17 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
                         <span>Cart</span>
                         <?php
                         // Show cart count if available
-                        if(isset($_SESSION['user_id'])) {
+                        if(isset($_SESSION['user_id']) && isset($conn)) {
                             $cartCountQuery = $conn->prepare("SELECT SUM(quantity) as total FROM cart WHERE user_id = ?");
-                            $cartCountQuery->bind_param("i", $_SESSION['user_id']);
-                            $cartCountQuery->execute();
-                            $cartCountResult = $cartCountQuery->get_result();
-                            $cartCount = $cartCountResult->fetch_assoc()['total'];
-                            $cartCountQuery->close();
-                            if($cartCount > 0) {
-                                echo "<span class='cart-count'>$cartCount</span>";
+                            if ($cartCountQuery) {
+                                $cartCountQuery->bind_param("i", $_SESSION['user_id']);
+                                $cartCountQuery->execute();
+                                $cartCountResult = $cartCountQuery->get_result();
+                                $cartCount = $cartCountResult->fetch_assoc()['total'];
+                                $cartCountQuery->close();
+                                if($cartCount > 0) {
+                                    echo "<span class='cart-count'>$cartCount</span>";
+                                }
                             }
                         }
                         ?>
@@ -134,7 +140,6 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
                     </a>
                 </div>
 
-                <!-- User Menu -->
                 <div class="user-menu">
                     <div class="user-avatar" onclick="toggleUserMenu()">
                         <i class="fas fa-user-circle"></i>
@@ -162,7 +167,7 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
                             <i class="fas fa-list"></i>
                             <span>My Orders</span>
                         </a>
-                        <?php if(isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1): // Admin check ?>
+                        <?php if(isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): // Admin check ?>
                         <a href="admin-products.php" class="dropdown-item">
                             <i class="fas fa-boxes"></i>
                             <span>Product Management</span>
@@ -180,7 +185,6 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
                     </div>
                 </div>
             <?php else: ?>
-                <!-- Guest navigation -->
                 <div class="nav-links">
                     <a href="about-us.php" class="nav-link <?php echo $current_page === 'about-us' ? 'active' : ''; ?>">
                         <i class="fas fa-info-circle"></i>
@@ -198,13 +202,11 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
             <?php endif; ?>
         </div>
 
-        <!-- Mobile Menu Toggle -->
         <div class="mobile-menu-toggle" onclick="toggleMobileMenu()">
             <i class="fas fa-bars"></i>
         </div>
     </div>
 
-    <!-- Mobile Navigation Menu -->
     <div class="mobile-nav" id="mobileNav">
         <div class="mobile-nav-header">
             <h3><?php echo getPageTitle($current_page); ?></h3>
@@ -238,7 +240,7 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
                         <i class="fas fa-list"></i>
                         <span>Orders</span>
                     </a>
-                    <?php if(isset($_SESSION['user_id']) && $_SESSION['user_id'] == 1): ?>
+                    <?php if(isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
                     <a href="admin-products.php" class="mobile-nav-link">
                         <i class="fas fa-boxes"></i>
                         <span>Product Management</span>
@@ -277,7 +279,6 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
     </div>
 </nav>
 
-<!-- Navigation Styles -->
 <style>
 :root {
     --nav-bg: #ffffff;
@@ -781,7 +782,6 @@ $userLastName = isset($_SESSION['lastName']) ? $_SESSION['lastName'] : '';
 }
 </style>
 
-<!-- Navigation JavaScript -->
 <script>
 // Toggle user dropdown
 function toggleUserMenu() {
